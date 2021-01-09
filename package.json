@@ -1,0 +1,15 @@
+{
+  "name": "comfortably-run",
+  "version": "1.0.0",
+  "description": "Inject JavaScript into existing Chrome extensions via the Chrome DevTools Protocol to abuse their permissions.",
+  "main": "injector.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "mandatory",
+  "license": "MIT",
+  "dependencies": {
+    "chrome-remote-interface": "^0.28.2",
+    "commander": "^6.2.1"
+  }
+}
