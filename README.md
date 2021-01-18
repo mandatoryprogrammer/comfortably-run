@@ -46,7 +46,7 @@ The above command demonstrates a few things which we'll break down by flag:
 
 * `-m create` This is specifying the injection mode as "create" (vs "existing"). The "create" mode is similar to the "existing" mode in one key way: if no windows or background pages exist with the specified origin then a background window will be created to inject into. While this is fairly stealthy, their is a brief visual cue.
 * `-c` This flag only works with `-m create`, it will automatically close a window after it's been created for the script injection (if one was created due to no existing windows with that origin being present).
-* `-s "JSON.stringify(Object.keys(window.chrome))"` This flag is specifying a script to inject into the origin we specified. In this case we're dumping all of the `chrome.*` APIs available to the `uBlock Origin` extension. **Importantly**, we should ensure the returned data is a string and not a complex object. You can also specify code that returns a promise and the CLI tool will automatically wait for appropriate resolution before returning the results.
+* `-s "JSON.stringify(Object.keys(window.chrome))"` This flag is specifying a script to inject into the origin we specified. This can be either an inline script OR a file path. In this case we're dumping all of the `chrome.*` APIs available to the `uBlock Origin` extension. **Importantly**, we should ensure the returned data is a string and not a complex object. You can also specify code that returns a promise and the CLI tool will automatically wait for appropriate resolution before returning the results.
 * `-o chrome-extension://cjpalhdlnbpafiamejdnhcphjbkeiagm` This specifies the origin to inject our script into, in this case the `uBlock Origin` extension.
 
 
