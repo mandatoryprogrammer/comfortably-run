@@ -3,6 +3,31 @@ const { Command } = require('commander');
 const util = require('util');
 const fs = require('fs');
 
+const POLICY_ENUMERATION_SCRIPT = `
+const wait = ms => new Promise(res => setTimeout(res, ms));
+async function get_chrome_policy() {
+	return new Promise(function(resolve, reject) {
+		var capture_policy = window.policy.Page.getInstance();
+		var chrome_policy = {};
+		capture_policy.onPoliciesReceived_ = function(policyNames, policyValues) {
+			resolve(JSON.parse(JSON.stringify(policyValues)));
+		};
+		capture_policy.initialize();
+	});
+}
+(async () => {
+	await wait((1000 * 2))
+	const chrome_policies = await get_chrome_policy();
+	const chrome_matching_policy = chrome_policies.filter(chrome_policy => {
+	    return chrome_policy.id === 'chrome'
+	});
+	if(chrome_matching_policy.length === 0) {
+		return null;
+	}
+	return JSON.stringify(chrome_matching_policy[0].policies);
+})();
+`;
+
 const EXTENSION_ENUMERATION_SCRIPT = `
 function get_chrome_extensions() {
 	return new Promise(function(resolve, reject) {
@@ -43,6 +68,7 @@ const program_banner = `
 	.option('-s, --script <value>', 'Either a path to a JavaScript file or inline JavaScript to execute in the specified origin.')
 	.option('-o, --origin <value>', 'The origin to inject the JavaScript into, such as https://example.com or chrome-extension://cjpalhdlnbpafiamejdnhcphjbkeiagm')
 	.option('-l, --list', 'List currently installed extensions and their permissions.', false)
+	.option('-gp, --getpolicy', 'Get Chrome browser enterprise policy.', false)
 
 	program.parse(process.argv);
 
@@ -57,35 +83,22 @@ const program_banner = `
 		port: host_settings.port
 	});
 
-	if(!(program.script && program.origin) && !program.list) {
-		console.error(`Error, both --script and --origin are required options unless --list is specified.`);
+	if(!(program.script && program.origin) && !program.list && !program.getpolicy) {
+		console.error(`Error, both --script and --origin are required options unless --list or --getpolicy is specified.`);
 		process.exit();
 	}
 
 	// List extensions and permissions
 	if(program.list) {
 		const target_origin = `chrome://extensions`;
-		const target_origin_metadata = await create_new_target_with_origin(
+		const script_results = await run_script_get_results(
 			cdp_client,
 			host_settings,
-			target_origin
+			target_origin,
+			EXTENSION_ENUMERATION_SCRIPT
 		);
 
-		const target_id = target_origin_metadata.targetId;
-
-		const extension_enumeration_result = await inject_script_into_target(
-			target_id,
-			host_settings,
-			EXTENSION_ENUMERATION_SCRIPT,
-			false
-		);
-
-		const extensions_array = JSON.parse(extension_enumeration_result.value);
-
-		await close_new_window(
-			target_id,
-			host_settings
-		);
+		const extensions_array = JSON.parse(script_results.value);
 
 		const formatted_extensions = extensions_array.map(extension_data => {
 			const combined_permissions = extension_data.hostPermissions.concat(
@@ -108,6 +121,25 @@ const program_banner = `
 			console.log(`\n--- \n`);
 		});
 
+		process.exit();
+	}
+
+	if(program.getpolicy) {
+		const target_origin = `chrome://policy`;
+		const script_results = await run_script_get_results(
+			cdp_client,
+			host_settings,
+			target_origin,
+			POLICY_ENUMERATION_SCRIPT
+		);
+
+		console.log(
+			JSON.stringify(
+				JSON.parse(script_results.value),
+				false,
+				4
+			)
+		);
 		process.exit();
 	}
 
@@ -182,6 +214,26 @@ const program_banner = `
 
 	process.exit(0);
 })();
+
+async function run_script_get_results(cdp_client, host_settings, target_origin, script) {
+	const target_origin_metadata = await create_new_target_with_origin(
+		cdp_client,
+		host_settings,
+		target_origin
+	);
+	const target_id = target_origin_metadata.targetId;
+	const script_result = await inject_script_into_target(
+		target_id,
+		host_settings,
+		script,
+		false
+	);
+	await close_new_window(
+		target_id,
+		host_settings
+	);
+	return script_result;
+}
 
 async function close_new_window(target_id, host_settings) {
 	const new_window_client = await CDP({
